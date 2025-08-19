@@ -39,6 +39,7 @@
 <body>
     <h1>QR Scanner</h1>
     <div class="warning">📱 Наведите камеру на QR-код купона</div>
+    <!-- Элемент для сканера -->
     <div id="qr-reader"></div>
     <div class="loading">Загрузка камеры...</div>
 
@@ -52,16 +53,15 @@
 
         function sendResult(qrData) {
             console.log("📤 Отправка данных в бот:", qrData);
-            if (window.Telegram && window.Telegram.WebApp) {
-                try {
-                    window.Telegram.WebApp.sendData(JSON.stringify({
-                        action: "redeem_coupon",
-                        qr_data: qrData
-                    }));
-                    console.log("✅ Данные отправлены");
-                } catch (e) {
-                    console.error("❌ Ошибка отправки:", e);
-                }
+            try {
+                window.Telegram.WebApp.sendData(JSON.stringify({
+                    action: "redeem_cupon",
+                    qr_data: qrData
+                }));
+                console.log("✅ Данные отправлены");
+                window.Telegram.WebApp.close();
+            } catch (e) {
+                console.error("❌ Ошибка отправки:", e);
             }
         }
 
@@ -72,7 +72,6 @@
         }
 
         function onScanFailure(error) {
-            // Игнорируем мелкие ошибки
             console.warn("📷 Ошибка сканирования:", error);
         }
 
@@ -81,7 +80,7 @@
             const loading = document.querySelector('.loading');
 
             const html5QrcodeScanner = new Html5QrcodeScanner(
-                "qr-reader",
+                "qr-reader",  // ← ID должен совпадать с div
                 {
                     fps: 10,
                     qrbox: { width: 300, height: 300 },
