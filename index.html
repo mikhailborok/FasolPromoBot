@@ -53,24 +53,24 @@
 
         function sendResult(qrData) {
             if (window.Telegram && window.Telegram.WebApp) {
+                // Отправляем данные в бота
                 window.Telegram.WebApp.sendData(JSON.stringify({
-                    action: "redeem_coupon",
+                    action: "redeem_cupon",
                     qr_data: qrData
                 }));
-                // Закрываем автоматически после отправки
+                // Закрываем Mini App после успешной передачи
                 setTimeout(closeScanner, 1500);
             }
         }
 
         function onScanSuccess(decodedText) {
-            // Останавливаем камеру
+            // Останавливаем сканирование
             html5QrcodeScanner.clear().catch(() => {});
             // Отправляем результат
             sendResult(decodedText);
         }
 
         function onScanFailure(error) {
-            // Не выводим ошибки — просто игнорируем
             console.warn(`QR сканирование: ${error}`);
         }
 
@@ -90,7 +90,7 @@
                 /* verbose */ false
             );
 
-            // Убираем надпись "Start scanning"
+            // Убираем кнопку "Start scanning"
             const oldRender = html5QrcodeScanner.render;
             html5QrcodeScanner.render = function (onScanSuccessOverride, onScanFailureOverride) {
                 oldRender.call(this, onScanSuccessOverride, onScanFailureOverride);
