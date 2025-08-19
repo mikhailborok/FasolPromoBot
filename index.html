@@ -39,30 +39,30 @@
 <body>
     <h1>QR Scanner</h1>
     <div class="warning">📱 Наведите камеру на QR-код купона</div>
-    <!-- Элемент для сканера -->
     <div id="qr-reader"></div>
     <div class="loading">Загрузка камеры...</div>
 
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script>
-        // Проверка доступности Telegram WebApp
+        // Проверка, что мы внутри Telegram Mini App
         if (!window.Telegram || !window.Telegram.WebApp) {
-            document.body.innerHTML = "<h2>❌ Ошибка: Mini App недоступна</h2>";
+            document.body.innerHTML = "<h2>❌ Ошибка: Mini App недоступна. Откройте через Telegram.</h2>";
             setTimeout(() => window.close(), 3000);
+            throw new Error("Not in Telegram");
         }
 
         function sendResult(qrData) {
             console.log("📤 Отправка данных в бот:", qrData);
             try {
                 window.Telegram.WebApp.sendData(JSON.stringify({
-                    action: "redeem_cupon",
+                    action: "redeem_coupon",
                     qr_data: qrData
                 }));
                 console.log("✅ Данные отправлены");
-                window.Telegram.WebApp.close();
             } catch (e) {
                 console.error("❌ Ошибка отправки:", e);
             }
+            setTimeout(() => window.Telegram.WebApp.close(), 1500);
         }
 
         function onScanSuccess(decodedText) {
@@ -76,11 +76,10 @@
         }
 
         window.addEventListener('load', () => {
-            const qrReader = document.getElementById('qr-reader');
             const loading = document.querySelector('.loading');
 
             const html5QrcodeScanner = new Html5QrcodeScanner(
-                "qr-reader",  // ← ID должен совпадать с div
+                "qr-reader",
                 {
                     fps: 10,
                     qrbox: { width: 300, height: 300 },
@@ -92,12 +91,9 @@
             );
 
             // Удаляем кнопку "Start scanning"
-            html5QrcodeScanner.render = (onScanSuccessOverride, onScanFailureOverride) => {
-                Html5QrcodeScanner.prototype.render.call(
-                    html5QrcodeScanner,
-                    onScanSuccessOverride,
-                    onScanFailureOverride
-                );
+            const oldRender = html5QrcodeScanner.render;
+            html5QrcodeScanner.render = function (onScanSuccessOverride, onScanFailureOverride) {
+                oldRender.call(this, onScanSuccessOverride, onScanFailureOverride);
                 const button = document.querySelector('.qr-code-scanner .control-button');
                 if (button) button.remove();
             };
@@ -110,7 +106,7 @@
                     observer.disconnect();
                 }
             });
-            observer.observe(qrReader, { childList: true, subtree: true });
+            observer.observe(document.getElementById('qr-reader'), { childList: true, subtree: true });
 
             // Запускаем сканирование
             html5QrcodeScanner.render(onScanSuccess, onScanFailure);
