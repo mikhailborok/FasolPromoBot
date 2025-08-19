@@ -10,29 +10,38 @@
             text-align: center;
             padding: 20px;
             background: #f5f5f5;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
         #qr-reader {
             width: 100%;
             max-width: 500px;
-            margin: 0 auto;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
-        button {
+        .loading {
             margin-top: 10px;
-            padding: 10px 20px;
+            color: #555;
+            font-size: 14px;
+        }
+        .warning {
+            color: #d32f2f;
+            font-weight: bold;
+            margin-bottom: 15px;
             font-size: 16px;
-            background: #0088cc;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
         }
     </style>
 </head>
 <body>
     <h1>QR Scanner</h1>
-    <p>Наведите камеру на QR-код купона</p>
+    <div class="warning">📱 Наведите камеру на QR-код купона</div>
     <div id="qr-reader"></div>
-    <button onclick="closeScanner()">Закрыть</button>
+    <div class="loading">Загрузка камеры...</div>
 
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script>
@@ -48,24 +57,63 @@
                     action: "redeem_coupon",
                     qr_data: qrData
                 }));
-                window.Telegram.WebApp.close();
+                // Закрываем автоматически после отправки
+                setTimeout(closeScanner, 1500);
             }
         }
 
         function onScanSuccess(decodedText) {
+            // Останавливаем камеру
+            html5QrcodeScanner.clear().catch(() => {});
+            // Отправляем результат
             sendResult(decodedText);
         }
 
         function onScanFailure(error) {
-            console.warn(`QR сканирование ошибочно: ${error}`);
+            // Не выводим ошибки — просто игнорируем
+            console.warn(`QR сканирование: ${error}`);
         }
 
         window.addEventListener('load', () => {
-            const reader = new Html5QrcodeScanner("qr-reader", {
-                fps: 10,
-                qrbox: 250
-            });
-            reader.render(onScanSuccess, onScanFailure);
+            const qrReader = document.getElementById('qr-reader');
+
+            // Создаём сканер
+            const html5QrcodeScanner = new Html5QrcodeScanner(
+                "qr-reader",
+                {
+                    fps: 10,
+                    qrbox: { width: 300, height: 300 },
+                    preferredCamera: "rear",  // ← Пытаемся использовать заднюю камеру
+                    rememberLastUsedCamera: true,
+                    supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+                },
+                /* verbose */ false
+            );
+
+            // Убираем надпись "Start scanning"
+            const oldRender = html5QrcodeScanner.render;
+            html5QrcodeScanner.render = function (onScanSuccessOverride, onScanFailureOverride) {
+                oldRender.call(this, onScanSuccessOverride, onScanFailureOverride);
+                // Удаляем кнопку "Start scanning"
+                const button = document.querySelector('.qr-code-scanner .control-button');
+                if (button) button.remove();
+
+                // Убираем "Loading camera" после запуска
+                const loading = document.querySelector('.loading');
+                if (loading) {
+                    const observer = new MutationObserver(() => {
+                        const video = document.querySelector('#qr-reader video');
+                        if (video && !video.paused) {
+                            loading.style.display = 'none';
+                            observer.disconnect();
+                        }
+                    });
+                    observer.observe(qrReader, { childList: true, subtree: true });
+                }
+            };
+
+            // Запускаем сканирование автоматически
+            html5QrcodeScanner.render(onScanSuccess, onScanFailure);
         });
     </script>
 </body>
