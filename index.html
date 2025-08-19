@@ -2,170 +2,121 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <title>QR Scanner</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>QR Scanner - Фасоль</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script src="https://unpkg.com/qr-scanner@1.4.2/qr-scanner.umd.min.js"></script>
     <style>
         body {
-            margin: 0;
-            padding: 20px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--tg-theme-bg-color, #ffffff);
-            color: var(--tg-theme-text-color, #000000);
-        }
-        
-        #scanner-container {
+            font-family: Arial, sans-serif;
             text-align: center;
-            max-width: 400px;
-            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
-        
-        #qr-video {
+        #qr-reader {
             width: 100%;
-            max-width: 300px;
-            height: 300px;
-            border: 2px solid #007bff;
-            border-radius: 10px;
-            object-fit: cover;
+            max-width: 500px;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
         }
-        
-        #result {
-            margin-top: 20px;
-            padding: 15px;
-            border-radius: 8px;
+        .warning {
+            color: #d32f2f;
+            font-weight: bold;
+            margin-bottom: 15px;
             font-size: 16px;
         }
-        
-        .success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        
-        .error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        
-        .info {
-            background-color: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
-        }
-        
-        h1 {
-            color: var(--tg-theme-text-color, #000000);
-            text-align: center;
-            margin-bottom: 20px;
+        .loading {
+            color: #555;
+            font-size: 14px;
         }
     </style>
 </head>
 <body>
-    <h1>🔍 QR Scanner</h1>
-    <div id="scanner-container">
-        <video id="qr-video"></video>
-        <div id="result" class="info">
-            📷 Наведите камеру на QR-код купона
-        </div>
-    </div>
+    <h1>QR Scanner</h1>
+    <div class="warning">📱 Наведите камеру на QR-код купона</div>
+    <div id="qr-reader"></div>
+    <div class="loading">Загрузка камеры...</div>
 
+    <!-- Подключаем html5-qrcode (один файл, не требует worker) -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script>
-        // Инициализация Telegram Web App
-        let tg = window.Telegram?.WebApp;
-        
-        if (tg) {
-            tg.ready();
-            tg.expand();
-            tg.MainButton.setText("❌ Отменить");
-            tg.MainButton.show();
-            
-            // Обработка кнопки отмены
-            tg.MainButton.onClick(() => {
-                if (window.qrScanner) {
-                    window.qrScanner.stop();
-                }
-                tg.close();
-            });
+        // Проверка, что мы в Telegram Mini App
+        if (!window.Telegram || !window.Telegram.WebApp) {
+            document.body.innerHTML = "<h2>❌ Ошибка: Mini App недоступна. Откройте через Telegram.</h2>";
+            throw new Error("Not in Telegram");
         }
-        
-        const video = document.getElementById('qr-video');
-        const resultDiv = document.getElementById('result');
-        
-        // Функция для отображения результатов
-        function showResult(message, type = 'info') {
-            resultDiv.className = type;
-            resultDiv.innerHTML = message;
-        }
-        
-        // Инициализация QR-сканера
-        try {
-            window.qrScanner = new QrScanner(
-                video,
-                result => {
-                    console.log('Отсканирован QR-код:', result.data);
-                    
-                    // Проверяем формат купона Фасоль
-                    if (result.data.startsWith('FASOLEY_COUPON_')) {
-                        showResult('✅ QR-код распознан! Погашаем купон...', 'success');
-                        
-                        // Отправляем данные в бота
-                        if (tg) {
-                            tg.sendData(JSON.stringify({
-                                action: 'redeem_coupon',
-                                qr_data: result.data,
-                                timestamp: new Date().toISOString()
-                            }));
-                            
-                            // Небольшая задержка перед закрытием
-                            setTimeout(() => {
-                                tg.close();
-                            }, 1000);
-                        } else {
-                            showResult('✅ QR-код: ' + result.data, 'success');
-                        }
-                        
-                        // Останавливаем сканер
-                        window.qrScanner.stop();
-                        
-                    } else {
-                        showResult('❌ Это не купон магазина Фасоль. Попробуйте другой QR-код.', 'error');
-                    }
-                },
-                {
-                    highlightScanRegion: true,
-                    highlightCodeOutline: true,
-                    maxScansPerSecond: 5,
-                    preferredCamera: 'environment' // Задняя камера
-                }
-            );
-            
-            // Запуск сканера
-            window.qrScanner.start().then(() => {
-                console.log('QR Scanner запущен');
-                showResult('📷 Камера активна. Наведите на QR-код купона.', 'info');
-            }).catch(error => {
-                console.error('Ошибка запуска сканера:', error);
-                showResult('❌ Не удалось запустить камеру. Проверьте разрешения.', 'error');
-            });
-            
-        } catch (error) {
-            console.error('Ошибка инициализации QR-сканера:', error);
-            showResult('❌ Ошибка инициализации сканера', 'error');
-        }
-        
-        // Остановка сканера при закрытии страницы
-        window.addEventListener('beforeunload', () => {
-            if (window.qrScanner) {
-                window.qrScanner.stop();
+
+        // Функция отправки результата
+        function sendResult(qrData) {
+            console.log("📤 Отправка данных в бот:", qrData);
+            try {
+                window.Telegram.WebApp.sendData(JSON.stringify({
+                    action: "redeem_coupon",
+                    qr_ qrData
+                }));
+                console.log("✅ Данные отправлены");
+            } catch (e) {
+                console.error("❌ Ошибка отправки:", e);
             }
-        });
-        
-        // Обработка ошибок камеры
-        video.addEventListener('error', (e) => {
-            console.error('Ошибка видео:', e);
-            showResult('❌ Ошибка доступа к камере', 'error');
+            // Закрываем через 1.5 секунды
+            setTimeout(() => window.Telegram.WebApp.close(), 1500);
+        }
+
+        // Обработка успешного сканирования
+        function onScanSuccess(decodedText) {
+            console.log("✅ QR распознан:", decodedText);
+            html5QrcodeScanner.clear().catch(console.error);
+            sendResult(decodedText);
+        }
+
+        // Обработка ошибок
+        function onScanFailure(error) {
+            console.warn("📷 Ошибка сканирования:", error);
+        }
+
+        // Запуск при загрузке
+        window.addEventListener('load', () => {
+            const qrReader = document.getElementById('qr-reader');
+            const loading = document.querySelector('.loading');
+
+            // Создаём сканер
+            const html5QrcodeScanner = new Html5QrcodeScanner(
+                "qr-reader",
+                {
+                    fps: 10,
+                    qrbox: { width: 300, height: 300 },
+                    preferredCamera: "rear",      // ← Задняя камера
+                    rememberLastUsedCamera: true,
+                    supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
+                },
+                false
+            );
+
+            // Удаляем кнопку "Start scanning"
+            const oldRender = html5QrcodeScanner.render;
+            html5QrcodeScanner.render = function (onScanSuccessOverride, onScanFailureOverride) {
+                oldRender.call(this, onScanSuccessOverride, onScanFailureOverride);
+                const button = document.querySelector('.qr-code-scanner .control-button');
+                if (button) button.remove();
+            };
+
+            // Скрываем "loading" после запуска камеры
+            const observer = new MutationObserver(() => {
+                const video = document.querySelector('#qr-reader video');
+                if (video && !video.paused) {
+                    loading.style.display = 'none';
+                    observer.disconnect();
+                }
+            });
+            observer.observe(qrReader, { childList: true, subtree: true });
+
+            // Запускаем сканирование
+            html5QrcodeScanner.render(onScanSuccess, onScanFailure);
         });
     </script>
 </body>
