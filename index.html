@@ -39,18 +39,22 @@
 <body>
     <h1>QR Scanner</h1>
     <div class="warning">📱 Наведите камеру на QR-код купона</div>
+    <!-- 🔽 ЭТОТ ЭЛЕМЕНТ ОБЯЗАТЕЛЕН -->
     <div id="qr-reader"></div>
     <div class="loading">Загрузка камеры...</div>
 
+    <!-- Подключаем библиотеку -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script>
         // Проверка, что мы внутри Telegram Mini App
         if (!window.Telegram || !window.Telegram.WebApp) {
             document.body.innerHTML = "<h2>❌ Ошибка: Mini App недоступна. Откройте через Telegram.</h2>";
-            setTimeout(() => window.close(), 3000);
+            // ❌ Убираем window.close() — он вызывает ошибку
+            // setTimeout(() => window.close(), 3000);
             throw new Error("Not in Telegram");
         }
 
+        // Функция отправки результата в бота
         function sendResult(qrData) {
             console.log("📤 Отправка данных в бот:", qrData);
             try {
@@ -62,32 +66,47 @@
             } catch (e) {
                 console.error("❌ Ошибка отправки:", e);
             }
-            setTimeout(() => window.Telegram.WebApp.close(), 1500);
+            // ❌ Убираем window.close() — Telegram сам закроет окно после sendData
+            // window.Telegram.WebApp.close();
         }
 
+        // Обработка успешного распознавания
         function onScanSuccess(decodedText) {
             console.log("✅ QR распознан:", decodedText);
+            // Останавливаем сканер
             html5QrcodeScanner.clear().catch(console.error);
+            // Отправляем результат
             sendResult(decodedText);
         }
 
+        // Обработка ошибок сканирования
         function onScanFailure(error) {
+            // Игнорируем мелкие ошибки
             console.warn("📷 Ошибка сканирования:", error);
         }
 
+        // Запуск при загрузке страницы
         window.addEventListener('load', () => {
+            const qrReader = document.getElementById('qr-reader');
             const loading = document.querySelector('.loading');
 
+            // Проверяем, что элемент существует
+            if (!qrReader) {
+                console.error("❌ Элемент #qr-reader не найден");
+                return;
+            }
+
+            // Создаём сканер
             const html5QrcodeScanner = new Html5QrcodeScanner(
-                "qr-reader",
+                "qr-reader",  // ← ID должен совпадать с div
                 {
                     fps: 10,
                     qrbox: { width: 300, height: 300 },
-                    preferredCamera: "rear",
+                    preferredCamera: "rear",      // ← Приоритет задней камеры
                     rememberLastUsedCamera: true,
                     supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA]
                 },
-                false
+                false  // verbose
             );
 
             // Удаляем кнопку "Start scanning"
@@ -106,7 +125,7 @@
                     observer.disconnect();
                 }
             });
-            observer.observe(document.getElementById('qr-reader'), { childList: true, subtree: true });
+            observer.observe(qrReader, { childList: true, subtree: true });
 
             // Запускаем сканирование
             html5QrcodeScanner.render(onScanSuccess, onScanFailure);
