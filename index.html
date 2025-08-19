@@ -1,62 +1,72 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>QR-Сканер купонов</title>
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding: 20px; }
-    #video { width: 100%; max-width: 500px; border: 2px solid #0078d7; border-radius: 10px; }
-    button { margin: 10px; padding: 10px 20px; font-size: 16px; background: #0078d7; color: white; border: none; border-radius: 5px; }
-  </style>
+    <meta charset="UTF-8">
+    <title>QR Scanner</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        #qr-reader {
+            width: 100%;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #0088cc;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body>
-  <h2>📷 Сканирование QR-кода купона</h2>
-  <video id="video" autoplay playsinline></video>
-  <br />
-  <button onclick="sendData()">Отправить результат</button>
-  <button onclick="closeApp()">Закрыть</button>
+    <h1>QR Scanner</h1>
+    <p>Наведите камеру на QR-код купона</p>
+    <div id="qr-reader"></div>
+    <button onclick="closeScanner()">Закрыть</button>
 
-  <script src="https://unpkg.com/@zxing/library@latest"></script>
-  <script>
-    const video = document.getElementById('video');
-    const codeReader = new ZXing.BrowserQRCodeReader();
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script>
+        function closeScanner() {
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.close();
+            }
+        }
 
-    async function startScan() {
-      try {
-        const result = await codeReader.decodeFromVideoDevice(null, video, (result, err) => {
-          if (result) {
-            window.qrData = result.getText();
-            console.log('QR распознан:', window.qrData);
-            document.querySelector('h2').textContent = '✅ QR распознан!';
-          }
-          if (err) console.error(err);
+        function sendResult(qrData) {
+            if (window.Telegram && window.Telegram.WebApp) {
+                window.Telegram.WebApp.sendData(JSON.stringify({
+                    action: "redeem_coupon",
+                    qr_data: qrData
+                }));
+                window.Telegram.WebApp.close();
+            }
+        }
+
+        function onScanSuccess(decodedText) {
+            sendResult(decodedText);
+        }
+
+        function onScanFailure(error) {
+            console.warn(`QR сканирование ошибочно: ${error}`);
+        }
+
+        window.addEventListener('load', () => {
+            const reader = new Html5QrcodeScanner("qr-reader", {
+                fps: 10,
+                qrbox: 250
+            });
+            reader.render(onScanSuccess, onScanFailure);
         });
-      } catch (err) {
-        console.error(err);
-        alert('Ошибка камеры: ' + err.message);
-      }
-    }
-
-    function sendData() {
-      if (!window.qrData) {
-        alert('Сначала отсканируйте QR-код');
-        return;
-      }
-      Telegram.WebApp.sendData(JSON.stringify({
-        action: 'redeem_coupon',
-        qr_data: window.qrData
-      }));
-      Telegram.WebApp.close();
-    }
-
-    function closeApp() {
-      Telegram.WebApp.close();
-    }
-
-    Telegram.WebApp.ready();
-    startScan();
-  </script>
+    </script>
 </body>
 </html>
