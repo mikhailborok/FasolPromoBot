@@ -204,72 +204,71 @@
 
         // Функция для вызова API бота
         async function getCoupon() {
-            try {
-                loadingDiv.style.display = 'block';
-                resultDiv.style.display = 'none';
-                spinButton.disabled = true;
+    try {
+        loadingDiv.style.display = 'block';
+        resultDiv.style.display = 'none';
+        spinButton.disabled = true;
 
-                // Получаем initData из Telegram Web App SDK
-                const initData = Telegram.WebApp.initData;
-                // debugDiv.textContent = `initData: ${initData}`; // Для отладки
-                if (!initData) {
-                    throw new Error("Не удалось получить данные инициализации (initData) от Telegram Web App.");
-                }
-
-                // Парсим initData для получения user_id
-                // initData - это строка в формате query string: "user=...&chat=...&hash=..."
-                const urlParams = new URLSearchParams(initData);
-                const userParam = urlParams.get('user');
-
-                if (!userParam) {
-                    throw new Error("Не удалось найти данные пользователя (user) в initData.");
-                }
-
-                let userId;
-                try {
-                    // Декодируем URI компонент, если он закодирован
-                    const decodedUserParam = decodeURIComponent(userParam);
-                    // debugDiv.textContent += `\nDecoded user param: ${decodedUserParam}`; // Для отладки
-                    const userData = JSON.parse(decodedUserParam);
-                    userId = userData.id;
-                } catch (parseError) {
-                    console.error("Ошибка парсинга user ", parseError);
-                    throw new Error("Не удалось распарсить данные пользователя из initData: " + parseError.message);
-                }
-
-                if (!userId) {
-                    throw new Error("Не удалось получить ID пользователя из данных initData.");
-                }
-
-                // --- ВАЖНО: Вставьте сюда URL, полученный от ngrok в Colab ---
-                // Замените 'https://xxxxxxx.ngrok-free.app' на ваш реальный URL
-                const NGROK_URL = 'https://93eb7e7f7f97.ngrok-free.app'; // <--- ВСТАВИТЬ СЮДА
-
-                const response = await fetch(`${NGROK_URL}/api/get_coupon`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        // Передаем initData для аутентификации на сервере
-                        'X-Telegram-Web-App-Init-Data': initData
-                    },
-                    body: JSON.stringify({ user_id: userId }) // Отправляем user_id в теле запроса
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    showResult(data);
-                } else {
-                    // Предполагаем, что сервер вернул объект с полем 'error'
-                    showError(data.error || `Ошибка сервера: ${response.status} ${response.statusText}`);
-                }
-            } catch (error) {
-                console.error("Ошибка при получении купона:", error);
-                showError("Ошибка сети или данных. Проверьте подключение и попробуйте снова. " + error.message);
-            } finally {
-                spinButton.disabled = false;
-            }
+        // Получаем initData из Telegram Web App SDK
+        const initData = Telegram.WebApp.initData;
+        if (!initData) {
+            throw new Error("Не удалось получить данные инициализации (initData) от Telegram Web App.");
         }
+
+        // Парсим initData для получения user_id
+        // initData - это строка в формате query string: "user=...&chat=...&hash=..."
+        const urlParams = new URLSearchParams(initData);
+        const userParam = urlParams.get('user');
+
+        if (!userParam) {
+            throw new Error("Не удалось найти данные пользователя (user) в initData.");
+        }
+
+        let userId;
+        try {
+            // Декодируем URI компонент, если он закодирован
+            const decodedUserParam = decodeURIComponent(userParam);
+            // Теперь парсим JSON
+            const userData = JSON.parse(decodedUserParam);
+            userId = userData.id;
+        } catch (parseError) {
+            console.error("Ошибка парсинга user ", parseError);
+            throw new Error("Не удалось распарсить данные пользователя из initData: " + parseError.message);
+        }
+
+        if (!userId) {
+            throw new Error("Не удалось получить ID пользователя из данных initData.");
+        }
+
+        // --- ВАЖНО: Вставьте сюда URL, полученный от ngrok в Colab ---
+        // Замените 'https://xxxxxxx.ngrok-free.app' на ваш реальный URL
+        const NGROK_URL = 'https://xxxxxxx.ngrok-free.app'; // <--- ВСТАВИТЬ СЮДА
+
+        const response = await fetch(`${NGROK_URL}/api/get coupon`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                // Передаем initData для аутентификации на сервере
+                'X-Telegram-Web-App-Init-Data': initData
+            },
+            body: JSON.stringify({ user_id: userId }) // Отправляем user_id в теле запроса
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            showResult(data);
+        } else {
+            // Предполагаем, что сервер вернул объект с полем 'error'
+            showError(data.error || `Ошибка сервера: ${response.status} ${response.statusText}`);
+        }
+    } catch (error) {
+        console.error("Ошибка при получении купона:", error);
+        showError("Ошибка сети или данных. Проверьте подключение и попробуйте снова. " + error.message);
+    } finally {
+        spinButton.disabled = false;
+    }
+}
 
         // Обработчик нажатия кнопки
         spinButton.addEventListener('click', async () => {
