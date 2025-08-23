@@ -125,36 +125,140 @@
             font-size: 0.8em;
             color: #ccc;
             text-align: left;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 10px;
+            display: none;
+        }
+        .debug-toggle {
+            background: rgba(255, 255, 255, 0.2);
+            border: none;
+            color: #ccc;
+            padding: 5px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 0.7em;
+        }
+        .warning {
+            color: #ffd43b;
+            background: rgba(255, 212, 59, 0.2);
+            padding: 10px;
+            border-radius: 10px;
+            margin: 10px 0;
+            display: none;
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🎰 Рулетка Акций</h1>
+        
+        <div id="warning" class="warning">
+            ⚠️ Запустите это приложение через Telegram бота для корректной работы
+        </div>
+        
         <div class="slots-container">
             <div class="slot"><span class="slot-icon">🎁</span></div>
             <div class="slot"><span class="slot-icon">🎉</span></div>
             <div class="slot"><span class="slot-icon">🍀</span></div>
         </div>
+        
         <button id="spinButton" class="spin-button">Мне повезет!</button>
+        
         <div id="loading" class="loading">
             <div class="spinner"></div>
             <p>Получаем вашу акцию...</p>
         </div>
+        
         <div id="result" class="result"></div>
-        <!-- <div id="debug" class="debug-info"></div> --> <!-- Раскомментируйте для отладки -->
+        
+        <button id="debugToggle" class="debug-toggle">Показать отладочную информацию</button>
+        <div id="debug" class="debug-info">
+            <h3>Отладочная информация:</h3>
+            <pre id="debugInfo">Загрузка...</pre>
+        </div>
     </div>
 
     <script>
-        // Инициализация Telegram Web App
-        Telegram.WebApp.ready();
-        Telegram.WebApp.expand(); // Расширяем Mini App на весь экран
-
+        // Элементы DOM
         const spinButton = document.getElementById('spinButton');
         const slots = document.querySelectorAll('.slot');
         const resultDiv = document.getElementById('result');
         const loadingDiv = document.getElementById('loading');
-        // const debugDiv = document.getElementById('debug'); // Для отладки
+        const debugDiv = document.getElementById('debug');
+        const debugInfo = document.getElementById('debugInfo');
+        const debugToggle = document.getElementById('debugToggle');
+        const warningDiv = document.getElementById('warning');
+
+        // Проверяем, запущено ли в Telegram WebApp
+        function isTelegramWebApp() {
+            return typeof Telegram !== 'undefined' && 
+                   Telegram.WebApp && 
+                   Telegram.WebApp.initData;
+        }
+
+        // Функция для обновления отладочной информации
+        function updateDebugInfo() {
+            const isTelegram = typeof Telegram !== 'undefined';
+            const hasWebApp = isTelegram && Telegram.WebApp;
+            const hasInitData = hasWebApp && Telegram.WebApp.initData;
+            const user = hasWebApp ? Telegram.WebApp.initDataUnsafe.user : null;
+            
+            let info = `Telegram WebApp: ${isTelegram ? '✅ Да' : '❌ Нет'}\n`;
+            info += `WebApp доступен: ${hasWebApp ? '✅ Да' : '❌ Нет'}\n`;
+            info += `InitData: ${hasInitData ? '✅ Есть' : '❌ Нет'}\n`;
+            
+            if (user) {
+                info += `User ID: ${user.id || '❌ Не доступен'}\n`;
+                info += `Username: ${user.username || '❌ Не доступен'}\n`;
+                info += `First Name: ${user.first_name || '❌ Не доступен'}\n`;
+                info += `Last Name: ${user.last_name || '❌ Не доступен'}\n`;
+            }
+            
+            if (hasInitData) {
+                info += `\nInitData содержимое:\n${Telegram.WebApp.initData}\n`;
+            }
+            
+            debugInfo.textContent = info;
+            
+            // Показываем предупреждение, если не в Telegram
+            if (!isTelegramWebApp()) {
+                warningDiv.style.display = 'block';
+                spinButton.disabled = true;
+            } else {
+                warningDiv.style.display = 'none';
+                spinButton.disabled = false;
+            }
+        }
+
+        // Переключение отладочной информации
+        debugToggle.addEventListener('click', function() {
+            if (debugDiv.style.display === 'none') {
+                debugDiv.style.display = 'block';
+                debugToggle.textContent = 'Скрыть отладочную информацию';
+                updateDebugInfo();
+            } else {
+                debugDiv.style.display = 'none';
+                debugToggle.textContent = 'Показать отладочную информацию';
+            }
+        });
+
+        // Инициализация Telegram Web App
+        function initTelegramWebApp() {
+            if (isTelegramWebApp()) {
+                Telegram.WebApp.ready();
+                Telegram.WebApp.expand();
+                console.log('Telegram WebApp инициализирован');
+                
+                // Обновляем информацию каждые 2 секунды
+                setInterval(updateDebugInfo, 2000);
+            } else {
+                console.warn('Не в Telegram WebApp - ограниченный функционал');
+                warningDiv.style.display = 'block';
+                spinButton.disabled = true;
+            }
+        }
 
         // Функция для анимации вращения слотов
         function spinSlots(duration = 3000) {
@@ -170,7 +274,7 @@
                         clearInterval(spinInterval);
                         resolve();
                     }
-                }, 100); // Обновляем каждые 100 мс
+                }, 100);
             });
         }
 
@@ -203,85 +307,92 @@
         }
 
         // Функция для вызова API бота
-async function getCoupon() {
-    try {
-        loadingDiv.style.display = 'block';
-        resultDiv.style.display = 'none';
-        spinButton.disabled = true;
+        async function getCoupon() {
+            try {
+                // Проверяем, что мы в Telegram WebApp
+                if (!isTelegramWebApp()) {
+                    throw new Error("Запустите это приложение через Telegram бота для получения акций");
+                }
 
-        // Получаем initData из Telegram Web App SDK
-        const initData = Telegram.WebApp.initData;
-        if (!initData || initData === '') {
-            throw new Error("Не удалось получить данные инициализации (initData) от Telegram Web App.");
+                loadingDiv.style.display = 'block';
+                resultDiv.style.display = 'none';
+                spinButton.disabled = true;
+
+                // Получаем данные пользователя безопасным способом
+                const user = Telegram.WebApp.initDataUnsafe.user;
+                if (!user || !user.id) {
+                    throw new Error("Не удалось получить данные пользователя. Перезапустите приложение.");
+                }
+
+                const userId = user.id;
+                const initData = Telegram.WebApp.initData;
+
+                console.log("Отправка запроса для user_id:", userId);
+                console.log("InitData доступен:", !!initData);
+
+                // URL вашего ngrok сервера
+                const NGROK_URL = 'https://badger-many-early.ngrok-free.app';
+
+                const response = await fetch(`${NGROK_URL}/api/get_coupon`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Telegram-Web-App-Init-Data': initData
+                    },
+                    body: JSON.stringify({ user_id: userId })
+                });
+
+                console.log("Статус ответа:", response.status);
+                
+                const data = await response.json();
+                console.log("Данные ответа:", data);
+
+                if (response.ok) {
+                    showResult(data);
+                } else {
+                    showError(data.error || `Ошибка сервера: ${response.status} ${response.statusText}`);
+                }
+            } catch (error) {
+                console.error("Ошибка при получении купона:", error);
+                
+                // Более информативные сообщения об ошибках
+                if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                    showError("Ошибка сети: не удалось подключиться к серверу. Проверьте интернет-соединение.");
+                } else if (error.message.includes('CORS')) {
+                    showError("Ошибка CORS: проблемы с настройками сервера.");
+                } else {
+                    showError(error.message || "Неизвестная ошибка. Попробуйте позже.");
+                }
+            } finally {
+                spinButton.disabled = false;
+            }
         }
-
-        // Парсим initData для получения user_id
-        // initData - это строка в формате query string: "user=...&chat=...&hash=..."
-        let urlParams;
-        try {
-            urlParams = new URLSearchParams(initData);
-        } catch (e) {
-            console.error("Ошибка при парсинге initData:", e);
-            throw new Error("Ошибка при парсинге данных инициализации.");
-        }
-
-        const userParam = urlParams.get('user');
-        if (!userParam) {
-            throw new Error("Не удалось найти данные пользователя (user) в initData.");
-        }
-
-        let userId;
-        try {
-            // Декодируем URI компонент, если он закодирован
-            const decodedUserParam = decodeURIComponent(userParam);
-            // Теперь парсим JSON
-            const userData = JSON.parse(decodedUserParam);
-            userId = userData.id;
-        } catch (parseError) {
-            console.error("Ошибка парсинга user ", parseError);
-            throw new Error("Не удалось распарсить данные пользователя из initData: " + parseError.message);
-        }
-
-        if (!userId) {
-            throw new Error("Не удалось получить ID пользователя из данных initData.");
-        }
-
-        // --- ВАЖНО: Вставьте сюда URL, полученный от ngrok в Colab ---
-        // Замените 'https://xxxxxxx.ngrok-free.app' на ваш реальный URL
-        const NGROK_URL = 'https://badger-many-early.ngrok-free.app'; // <--- ВСТАВИТЬ СЮДА
-
-        const response = await fetch(`${NGROK_URL}/api/get coupon`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                // Передаем initData для аутентификации на сервере
-                'X-Telegram-Web-App-Init-Data': initData
-            },
-            body: JSON.stringify({ user_id: userId }) // Отправляем user_id в теле запроса
-        });
-
-        const data = await response.json();
-
-        if (response.ok) {
-            showResult(data);
-        } else {
-            // Предполагаем, что сервер вернул объект с полем 'error'
-            showError(data.error || `Ошибка сервера: ${response.status} ${response.statusText}`);
-        }
-    } catch (error) {
-        console.error("Ошибка при получении купона:", error);
-        showError("Ошибка сети или данных. Проверьте подключение и попробуйте снова. " + error.message);
-    } finally {
-        spinButton.disabled = false;
-    }
-}
 
         // Обработчик нажатия кнопки
         spinButton.addEventListener('click', async () => {
-            // Запускаем анимацию вращения на 3 секунды
-            await spinSlots(3000);
-            // После окончания анимации получаем купон
-            await getCoupon();
+            if (!isTelegramWebApp()) {
+                showError("Запустите это приложение через Telegram бота для получения акций");
+                return;
+            }
+
+            try {
+                // Запускаем анимацию вращения на 3 секунды
+                await spinSlots(3000);
+                // После окончания анимации получаем купон
+                await getCoupon();
+            } catch (error) {
+                console.error("Ошибка в обработчике кнопки:", error);
+                showError("Произошла ошибка при обработке запроса");
+            }
+        });
+
+        // Инициализация при загрузке
+        document.addEventListener('DOMContentLoaded', function() {
+            initTelegramWebApp();
+            updateDebugInfo();
+            
+            // Периодическое обновление информации
+            setInterval(updateDebugInfo, 3000);
         });
 
     </script>
