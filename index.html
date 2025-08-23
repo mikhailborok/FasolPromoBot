@@ -203,7 +203,7 @@
         }
 
         // Функция для вызова API бота
-        async function getCoupon() {
+async function getCoupon() {
     try {
         loadingDiv.style.display = 'block';
         resultDiv.style.display = 'none';
@@ -211,15 +211,21 @@
 
         // Получаем initData из Telegram Web App SDK
         const initData = Telegram.WebApp.initData;
-        if (!initData) {
+        if (!initData || initData === '') {
             throw new Error("Не удалось получить данные инициализации (initData) от Telegram Web App.");
         }
 
         // Парсим initData для получения user_id
         // initData - это строка в формате query string: "user=...&chat=...&hash=..."
-        const urlParams = new URLSearchParams(initData);
-        const userParam = urlParams.get('user');
+        let urlParams;
+        try {
+            urlParams = new URLSearchParams(initData);
+        } catch (e) {
+            console.error("Ошибка при парсинге initData:", e);
+            throw new Error("Ошибка при парсинге данных инициализации.");
+        }
 
+        const userParam = urlParams.get('user');
         if (!userParam) {
             throw new Error("Не удалось найти данные пользователя (user) в initData.");
         }
