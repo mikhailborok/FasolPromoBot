@@ -372,35 +372,44 @@ function getPromotionsFromBot() {
         }
 
         function initializeWheel() {
-            try {
-                prizes = getPromotionsFromBot();
-                
-                if (prizes.length < 2 || prizes.length > 5) {
-                    console.warn('Неправильное количество акций, используем стандартные');
-                    prizes = getDefaultPromotions();
-                }
-                
-                createWheel(prizes);
-                
-                // Показываем рулетку
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('wheelContainer').style.display = 'block';
-                document.getElementById('spinButton').style.display = 'inline-block';
-                
-            } catch (error) {
-                console.error('Ошибка инициализации рулетки:', error);
-                document.getElementById('loading').textContent = 'Ошибка загрузки акций';
-                
-                // Используем стандартные акции
-                setTimeout(() => {
-                    prizes = getDefaultPromotions();
-                    createWheel(prizes);
-                    document.getElementById('loading').style.display = 'none';
-                    document.getElementById('wheelContainer').style.display = 'block';
-                    document.getElementById('spinButton').style.display = 'inline-block';
-                }, 2000);
-            }
+    try {
+        // ОТЛАДКА: Выводим всю доступную информацию
+        console.log('Current URL:', window.location.href);
+        console.log('URL Hash:', window.location.hash);
+        console.log('URL Search:', window.location.search);
+        console.log('InitData:', tg.initData);
+        console.log('InitDataUnsafe:', tg.initDataUnsafe);
+        
+        prizes = getPromotionsFromBot();
+        console.log('Полученные акции:', prizes);
+        
+        if (prizes.length < 2 || prizes.length > 5) {
+            console.warn('Неправильное количество акций, используем стандартные');
+            prizes = getDefaultPromotions();
         }
+        
+        createWheel(prizes);
+        
+        // Показываем рулетку
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('wheelContainer').style.display = 'block';
+        document.getElementById('spinButton').style.display = 'inline-block';
+        
+    } catch (error) {
+        console.error('Ошибка инициализации рулетки:', error);
+        document.getElementById('loading').textContent = 'Ошибка загрузки акций';
+        
+        // Используем стандартные акции
+        setTimeout(() => {
+            prizes = getDefaultPromotions();
+            createWheel(prizes);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('wheelContainer').style.display = 'block';
+            document.getElementById('spinButton').style.display = 'inline-block';
+        }, 2000);
+    }
+}
+
 
         function spinWheel() {
             if (isSpinning) return;
