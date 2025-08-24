@@ -6,6 +6,7 @@
     <title>Рулетка Фасоль</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
+        /* [Стили остаются те же] */
         body {
             margin: 0;
             padding: 20px;
@@ -196,7 +197,7 @@
         tg.expand();
         tg.ready();
 
-        // Массив призов (будет заполнен из initData)
+        // Массив призов
         let prizes = [];
         let isSpinning = false;
 
@@ -205,68 +206,49 @@
             '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57'
         ];
 
-        // Получение акций из initData от Telegram бота
+        // ИСПРАВЛЕННАЯ ФУНКЦИЯ получения акций из URL hash
         function getPromotionsFromBot() {
             try {
-                // Получаем данные от Telegram WebApp
-                const initData = tg.initData;
-                const urlParams = new URLSearchParams(initData);
-                
-                // Проверяем, передал ли бот акции через initData
-                let promotions = [];
-                
-                // Способ 1: Данные переданы через start_param
+                // Способ 1: Получаем из URL hash (самый простой и надежный)
+                const hash = window.location.hash.substring(1);
+                if (hash) {
+                    const promotions = hash.split('|').filter(p => p.trim());
+                    if (promotions.length >= 2) {
+                        console.log('Акции получены из hash:', promotions);
+                        return promotions;
+                    }
+                }
+
+                // Способ 2: Из URL параметров
+                const urlParams = new URLSearchParams(window.location.search);
                 const startParam = urlParams.get('start_param');
                 if (startParam) {
                     try {
                         const decodedParam = decodeURIComponent(startParam);
-                        promotions = JSON.parse(decodedParam);
+                        const promotions = JSON.parse(decodedParam);
+                        if (Array.isArray(promotions) && promotions.length >= 2) {
+                            console.log('Акции получены из start_param:', promotions);
+                            return promotions;
+                        }
                     } catch (e) {
                         console.warn('Не удалось распарсить start_param:', e);
                     }
                 }
-                
-                // Способ 2: Данные переданы через пользовательские поля
-                if (promotions.length === 0) {
-                    const userDataString = urlParams.get('user');
-                    if (userDataString) {
-                        try {
-                            const userData = JSON.parse(decodeURIComponent(userDataString));
-                            if (userData.promotions) {
-                                promotions = userData.promotions;
-                            }
-                        } catch (e) {
-                            console.warn('Не удалось получить данные пользователя:', e);
+
+                // Способ 3: Из initData
+                if (tg.initDataUnsafe && tg.initDataUnsafe.start_param) {
+                    try {
+                        const promotions = JSON.parse(decodeURIComponent(tg.initDataUnsafe.start_param));
+                        if (Array.isArray(promotions) && promotions.length >= 2) {
+                            console.log('Акции получены из initData:', promotions);
+                            return promotions;
                         }
+                    } catch (e) {
+                        console.warn('Не удалось распарсить initData start_param:', e);
                     }
                 }
                 
-                // Способ 3: Запрос акций через postMessage к родительскому окну (боту)
-                if (promotions.length === 0) {
-                    // Отправляем запрос боту на получение акций
-                    tg.sendData(JSON.stringify({
-                        action: 'get_promotions',
-                        user_id: tg.initDataUnsafe?.user?.id
-                    }));
-                    
-                    // Ждем ответ от бота через событие
-                    return new Promise((resolve) => {
-                        const timeout = setTimeout(() => {
-                            // Если ответа нет, используем стандартные акции
-                            resolve(getDefaultPromotions());
-                        }, 3000);
-                        
-                        // Слушаем ответ от бота
-                        window.addEventListener('message', function(event) {
-                            if (event.data && event.data.promotions) {
-                                clearTimeout(timeout);
-                                resolve(event.data.promotions);
-                            }
-                        }, { once: true });
-                    });
-                }
-                
-                return promotions.length > 0 ? promotions : getDefaultPromotions();
+                throw new Error('Не удалось получить акции от бота');
                 
             } catch (error) {
                 console.error('Ошибка получения акций:', error);
@@ -274,7 +256,7 @@
             }
         }
 
-        // Стандартные акции на случай, если не удалось получить из базы
+        // Стандартные акции
         function getDefaultPromotions() {
             return [
                 "☕ Кофе в подарок",
@@ -289,7 +271,7 @@
             const sectorsCount = promotions.length;
             const anglePerSector = 360 / sectorsCount;
             
-            wheel.innerHTML = ''; // Очищаем существующие секторы
+            wheel.innerHTML = '';
             
             for (let i = 0; i < sectorsCount; i++) {
                 const sector = document.createElement('div');
@@ -325,7 +307,7 @@
                 const textRotation = -(i * anglePerSector) + (anglePerSector / 2);
                 sectorText.style.transform = `translate(-50%, -50%) rotate(${textRotation}deg)`;
                 
-                // Регулируем размер шрифта в зависимости от количества секторов и длины текста
+                // Регулируем размер шрифта
                 let fontSize;
                 if (sectorsCount <= 3) {
                     fontSize = promotions[i].length > 15 ? '10px' : '12px';
@@ -339,20 +321,13 @@
             }
         }
 
-        async function initializeWheel() {
+        function initializeWheel() {
             try {
-                // Получаем акции асинхронно
-                const promotionsResult = getPromotionsFromBot();
-                
-                // Если это промис, ждем его выполнения
-                if (promotionsResult instanceof Promise) {
-                    prizes = await promotionsResult;
-                } else {
-                    prizes = promotionsResult;
-                }
+                prizes = getPromotionsFromBot();
                 
                 if (prizes.length < 2 || prizes.length > 5) {
-                    throw new Error('Количество акций должно быть от 2 до 5');
+                    console.warn('Неправильное количество акций, используем стандартные');
+                    prizes = getDefaultPromotions();
                 }
                 
                 createWheel(prizes);
@@ -363,10 +338,10 @@
                 document.getElementById('spinButton').style.display = 'inline-block';
                 
             } catch (error) {
-                document.getElementById('loading').textContent = 'Ошибка загрузки акций';
                 console.error('Ошибка инициализации рулетки:', error);
+                document.getElementById('loading').textContent = 'Ошибка загрузки акций';
                 
-                // Используем стандартные акции в случае ошибки
+                // Используем стандартные акции
                 setTimeout(() => {
                     prizes = getDefaultPromotions();
                     createWheel(prizes);
@@ -387,21 +362,15 @@
             button.disabled = true;
             button.textContent = '🎲 КРУТИТСЯ...';
 
-            // Генерируем случайное число оборотов (минимум 5 полных оборотов)
             const minSpins = 5;
             const maxSpins = 8;
             const spins = Math.random() * (maxSpins - minSpins) + minSpins;
-            
-            // Выбираем случайный сектор
             const winningSection = Math.floor(Math.random() * prizes.length);
-            
-            // Вычисляем угол для остановки
             const anglePerSector = 360 / prizes.length;
             const finalAngle = (360 * spins) + (winningSection * anglePerSector) + (anglePerSector / 2);
             
             wheel.style.transform = `rotate(${finalAngle}deg)`;
 
-            // Показываем результат через 6 секунд
             setTimeout(() => {
                 showResult(winningSection);
                 isSpinning = false;
@@ -410,8 +379,6 @@
 
         function showResult(sectionIndex) {
             const prize = prizes[sectionIndex];
-            
-            // Генерируем 6-значный код купона
             const couponCode = Math.floor(100000 + Math.random() * 900000);
             
             document.getElementById('prizeText').textContent = `🎉 Поздравляем! Вы выиграли: ${prize}`;
@@ -429,12 +396,10 @@
             tg.close();
         }
 
-        // Обработка кнопки "Назад" в Telegram
         tg.onEvent('backButtonClicked', function() {
             tg.close();
         });
 
-        // Показываем кнопку "Назад"
         tg.BackButton.show();
 
         // Инициализируем рулетку при загрузке
