@@ -47,7 +47,7 @@
             position: relative;
             overflow: hidden;
             box-shadow: 0 0 20px rgba(0,0,0,0.3);
-            transition: transform 3s cubic-bezier(0.23, 1, 0.32, 1);
+            transition: transform 6s cubic-bezier(0.23, 1, 0.32, 1);
         }
 
         .sector {
@@ -58,27 +58,30 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 14px;
             font-weight: bold;
             color: white;
-            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
             text-align: center;
-            padding: 10px;
-            box-sizing: border-box;
+            overflow: hidden;
         }
 
-        .sector1 { background: #ff6b6b; transform: rotate(0deg); }
-        .sector2 { background: #4ecdc4; transform: rotate(60deg); }
-        .sector3 { background: #45b7d1; transform: rotate(120deg); }
-        .sector4 { background: #96ceb4; transform: rotate(180deg); }
-        .sector5 { background: #feca57; transform: rotate(240deg); }
-        .sector6 { background: #ff9ff3; transform: rotate(300deg); }
-
         .sector-text {
-            transform: rotate(-30deg);
-            width: 80px;
-            font-size: 12px;
+            width: 100px;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
             line-height: 1.2;
+            font-size: 11px;
+            padding: 10px;
+            box-sizing: border-box;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            word-wrap: break-word;
+            hyphens: auto;
         }
 
         .pointer {
@@ -92,7 +95,7 @@
             border-right: 15px solid transparent;
             border-top: 30px solid #fff;
             z-index: 10;
-            drop-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
         }
 
         .spin-button {
@@ -157,25 +160,27 @@
             cursor: pointer;
             margin-top: 15px;
         }
+
+        .loading {
+            font-size: 18px;
+            margin: 20px 0;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="title">🎰 Рулетка удачи Фасоль</div>
         
-        <div class="wheel-container">
+        <div class="loading" id="loading">Загрузка акций...</div>
+        
+        <div class="wheel-container" id="wheelContainer" style="display: none;">
             <div class="pointer"></div>
             <div class="wheel" id="wheel">
-                <div class="sector sector1"><div class="sector-text">☕ Кофе в подарок</div></div>
-                <div class="sector sector2"><div class="sector-text">📉 Скидка 5%</div></div>
-                <div class="sector sector3"><div class="sector-text">🍭 Конфеты в подарок</div></div>
-                <div class="sector sector4"><div class="sector-text">🥤 Напиток в подарок</div></div>
-                <div class="sector sector5"><div class="sector-text">🍫 Шоколад в подарок</div></div>
-                <div class="sector sector6"><div class="sector-text">📉 Скидка 10%</div></div>
+                <!-- Секторы будут созданы динамически -->
             </div>
         </div>
 
-        <button class="spin-button" id="spinButton" onclick="spinWheel()">🎲 КРУТИТЬ РУЛЕТКУ</button>
+        <button class="spin-button" id="spinButton" onclick="spinWheel()" style="display: none;">🎲 КРУТИТЬ РУЛЕТКУ</button>
 
         <div class="result" id="result">
             <div id="prizeText"></div>
@@ -191,17 +196,186 @@
         tg.expand();
         tg.ready();
 
-        // Массив призов (соответствует секторам рулетки)
-        const prizes = [
-            "☕ Кофе в подарок",
-            "📉 Скидка 5% на чек", 
-            "🍭 Конфеты в подарок",
-            "🥤 Напиток в подарок",
-            "🍫 Шоколад в подарок",
-            "📉 Скидка 10% на чек"
+        // Массив призов (будет заполнен из initData)
+        let prizes = [];
+        let isSpinning = false;
+
+        // Цвета для секторов
+        const sectorColors = [
+            '#ff6b6b', '#4ecdc4', '#45b7d1', '#96ceb4', '#feca57'
         ];
 
-        let isSpinning = false;
+        // Получение акций из initData от Telegram бота
+        function getPromotionsFromBot() {
+            try {
+                // Получаем данные от Telegram WebApp
+                const initData = tg.initData;
+                const urlParams = new URLSearchParams(initData);
+                
+                // Проверяем, передал ли бот акции через initData
+                let promotions = [];
+                
+                // Способ 1: Данные переданы через start_param
+                const startParam = urlParams.get('start_param');
+                if (startParam) {
+                    try {
+                        const decodedParam = decodeURIComponent(startParam);
+                        promotions = JSON.parse(decodedParam);
+                    } catch (e) {
+                        console.warn('Не удалось распарсить start_param:', e);
+                    }
+                }
+                
+                // Способ 2: Данные переданы через пользовательские поля
+                if (promotions.length === 0) {
+                    const userDataString = urlParams.get('user');
+                    if (userDataString) {
+                        try {
+                            const userData = JSON.parse(decodeURIComponent(userDataString));
+                            if (userData.promotions) {
+                                promotions = userData.promotions;
+                            }
+                        } catch (e) {
+                            console.warn('Не удалось получить данные пользователя:', e);
+                        }
+                    }
+                }
+                
+                // Способ 3: Запрос акций через postMessage к родительскому окну (боту)
+                if (promotions.length === 0) {
+                    // Отправляем запрос боту на получение акций
+                    tg.sendData(JSON.stringify({
+                        action: 'get_promotions',
+                        user_id: tg.initDataUnsafe?.user?.id
+                    }));
+                    
+                    // Ждем ответ от бота через событие
+                    return new Promise((resolve) => {
+                        const timeout = setTimeout(() => {
+                            // Если ответа нет, используем стандартные акции
+                            resolve(getDefaultPromotions());
+                        }, 3000);
+                        
+                        // Слушаем ответ от бота
+                        window.addEventListener('message', function(event) {
+                            if (event.data && event.data.promotions) {
+                                clearTimeout(timeout);
+                                resolve(event.data.promotions);
+                            }
+                        }, { once: true });
+                    });
+                }
+                
+                return promotions.length > 0 ? promotions : getDefaultPromotions();
+                
+            } catch (error) {
+                console.error('Ошибка получения акций:', error);
+                return getDefaultPromotions();
+            }
+        }
+
+        // Стандартные акции на случай, если не удалось получить из базы
+        function getDefaultPromotions() {
+            return [
+                "☕ Кофе в подарок",
+                "📉 Скидка 5% на чек", 
+                "🍭 Конфеты в подарок",
+                "🥤 Напиток в подарок"
+            ];
+        }
+
+        function createWheel(promotions) {
+            const wheel = document.getElementById('wheel');
+            const sectorsCount = promotions.length;
+            const anglePerSector = 360 / sectorsCount;
+            
+            wheel.innerHTML = ''; // Очищаем существующие секторы
+            
+            for (let i = 0; i < sectorsCount; i++) {
+                const sector = document.createElement('div');
+                sector.className = 'sector';
+                
+                // Создаем clip-path для сектора
+                const startAngle = (i * anglePerSector) - (anglePerSector / 2);
+                const endAngle = ((i + 1) * anglePerSector) - (anglePerSector / 2);
+                
+                const x1 = 50 + 50 * Math.cos((startAngle) * Math.PI / 180);
+                const y1 = 50 + 50 * Math.sin((startAngle) * Math.PI / 180);
+                const x2 = 50 + 50 * Math.cos((endAngle) * Math.PI / 180);
+                const y2 = 50 + 50 * Math.sin((endAngle) * Math.PI / 180);
+                
+                let clipPath;
+                if (sectorsCount === 2) {
+                    clipPath = i === 0 ? 'polygon(50% 50%, 50% 0%, 100% 0%, 100% 100%, 50% 100%)' 
+                                       : 'polygon(50% 50%, 50% 0%, 0% 0%, 0% 100%, 50% 100%)';
+                } else {
+                    clipPath = `polygon(50% 50%, ${x1}% ${y1}%, ${x2}% ${y2}%)`;
+                }
+                
+                sector.style.clipPath = clipPath;
+                sector.style.background = sectorColors[i];
+                sector.style.transform = `rotate(${i * anglePerSector}deg)`;
+                
+                // Создаем текст сектора
+                const sectorText = document.createElement('div');
+                sectorText.className = 'sector-text';
+                sectorText.innerHTML = promotions[i];
+                
+                // Поворачиваем текст для правильной ориентации
+                const textRotation = -(i * anglePerSector) + (anglePerSector / 2);
+                sectorText.style.transform = `translate(-50%, -50%) rotate(${textRotation}deg)`;
+                
+                // Регулируем размер шрифта в зависимости от количества секторов и длины текста
+                let fontSize;
+                if (sectorsCount <= 3) {
+                    fontSize = promotions[i].length > 15 ? '10px' : '12px';
+                } else {
+                    fontSize = promotions[i].length > 15 ? '8px' : '10px';
+                }
+                sectorText.style.fontSize = fontSize;
+                
+                sector.appendChild(sectorText);
+                wheel.appendChild(sector);
+            }
+        }
+
+        async function initializeWheel() {
+            try {
+                // Получаем акции асинхронно
+                const promotionsResult = getPromotionsFromBot();
+                
+                // Если это промис, ждем его выполнения
+                if (promotionsResult instanceof Promise) {
+                    prizes = await promotionsResult;
+                } else {
+                    prizes = promotionsResult;
+                }
+                
+                if (prizes.length < 2 || prizes.length > 5) {
+                    throw new Error('Количество акций должно быть от 2 до 5');
+                }
+                
+                createWheel(prizes);
+                
+                // Показываем рулетку
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('wheelContainer').style.display = 'block';
+                document.getElementById('spinButton').style.display = 'inline-block';
+                
+            } catch (error) {
+                document.getElementById('loading').textContent = 'Ошибка загрузки акций';
+                console.error('Ошибка инициализации рулетки:', error);
+                
+                // Используем стандартные акции в случае ошибки
+                setTimeout(() => {
+                    prizes = getDefaultPromotions();
+                    createWheel(prizes);
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('wheelContainer').style.display = 'block';
+                    document.getElementById('spinButton').style.display = 'inline-block';
+                }, 2000);
+            }
+        }
 
         function spinWheel() {
             if (isSpinning) return;
@@ -218,20 +392,20 @@
             const maxSpins = 8;
             const spins = Math.random() * (maxSpins - minSpins) + minSpins;
             
-            // Выбираем случайный сектор (0-5)
-            const winningSection = Math.floor(Math.random() * 6);
+            // Выбираем случайный сектор
+            const winningSection = Math.floor(Math.random() * prizes.length);
             
-            // Каждый сектор занимает 60 градусов, начинаем с 30 градусов для центровки
-            const sectionAngle = 60;
-            const finalAngle = (360 * spins) + (winningSection * sectionAngle) + 30;
+            // Вычисляем угол для остановки
+            const anglePerSector = 360 / prizes.length;
+            const finalAngle = (360 * spins) + (winningSection * anglePerSector) + (anglePerSector / 2);
             
             wheel.style.transform = `rotate(${finalAngle}deg)`;
 
-            // Показываем результат через 3 секунды
+            // Показываем результат через 6 секунд
             setTimeout(() => {
                 showResult(winningSection);
                 isSpinning = false;
-            }, 3000);
+            }, 6000);
         }
 
         function showResult(sectionIndex) {
@@ -262,6 +436,9 @@
 
         // Показываем кнопку "Назад"
         tg.BackButton.show();
+
+        // Инициализируем рулетку при загрузке
+        window.addEventListener('load', initializeWheel);
     </script>
 </body>
 </html>
